@@ -4,21 +4,17 @@ A hobby project to build visualisations based on Strava activities
 
 ![The Results](./animation.gif)
 
+Inspired by: [this](https://www.reddit.com/r/dataisbeautiful/comments/s607z5/oc_2021_recap_of_my_runs_on_strava/)
+
 ## Python Setup
 
 The following Python environment will be needed to run this project.
 
-### Install Python with tk support
+### Install Python
 
 ```
-brew install python-tk
+brew install python
 ```
-
-Test it out
-```
-python -m tkinter
-```
-
 
 ### Create a virtual or activate environment 
 
@@ -31,8 +27,5 @@ source ./venv/bin/activate
 
 ```
 pip install python-dateutil 
+pip install pillow
 ```
-
-Maybe: 
-- pip install pillow
-
