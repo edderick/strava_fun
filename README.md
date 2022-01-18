@@ -2,6 +2,8 @@
 
 A hobby project to build visualisations based on Strava activities
 
+![The Results](./animation.gif)
+
 ## Python Setup
 
 The following Python environment will be needed to run this project.
