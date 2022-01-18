@@ -7,21 +7,28 @@ import time
 import threading
 import dateutil.parser
 import math
-from datetime import datetime
+from datetime import datetime, timedelta
+
+from PIL import Image, ImageDraw
 
 WIDTH = 500
 HEIGHT = 500
 
 SPEED = 300
+FPS = 12
 
-root = tkinter.Tk()
-myCanvas = tkinter.Canvas(root, bg="white", height=HEIGHT, width=WIDTH)
-myCanvas.pack()
+images = []
 
-def plot_coord(x, y, size=5):
-	arc = myCanvas.create_oval(x, y, x+size, y+size, fill='red', outline='red')
+trees = [
+    ET.parse('./Just_Keep_Going_Past_the_Library_.gpx'), 
+    ET.parse('./Just_Checking_New_York_is_Still_There.gpx'),
+    ET.parse('./Citibike_be_slow_yo.gpx'),
+    ET.parse('./Nowhere_in_Particular.gpx'),
+    ET.parse('./Christmas_Ride.gpx'),
+    ET.parse('./PPx5.gpx'),
+]
 
-tree = ET.parse('./Just_Keep_Going_Past_the_Library_.gpx')
+print(f'Processing {len(trees)} file(s)')
 
 # You're smarter than this. -.-
 min_lat = float('inf')
@@ -30,54 +37,122 @@ min_lon = float('inf')
 max_lon = float('-inf')
 
 start_time = None
+end_time = None
 num_coors = 0
 
-for trkpt in tree.iter('{http://www.topografix.com/GPX/1/1}trkpt'):
-	lat = float(trkpt.get('lat'))
-	lon = float(trkpt.get('lon'))
-	min_lat = min(min_lat, lat)
-	max_lat = max(max_lat, lat)
-	min_lon = min(min_lon, lon)
-	max_lon = max(max_lon, lon)
+start_times = []
+end_times = []
 
-	if start_time is None:
-		start_time = dateutil.parser.isoparse(trkpt.find('{http://www.topografix.com/GPX/1/1}time').text)
-	
-	num_coors += 1
+for tree in trees:
+    for trkpt in tree.iter('{http://www.topografix.com/GPX/1/1}trkpt'):
+        lat = float(trkpt.get('lat'))
+        lon = float(trkpt.get('lon'))
+        min_lat = min(min_lat, lat)
+        max_lat = max(max_lat, lat)
+        min_lon = min(min_lon, lon)
+        max_lon = max(max_lon, lon)
+
+        if start_time is None:
+            start_time = dateutil.parser.isoparse(trkpt.find('{http://www.topografix.com/GPX/1/1}time').text)
+        
+        # Who cares about efficiency?
+        end_time = dateutil.parser.isoparse(trkpt.find('{http://www.topografix.com/GPX/1/1}time').text)
+    
+        num_coors += 1
+
+    start_times.append(start_time)
+    end_times.append(end_time)
+
+    start_time=None
 
 print(f"{min_lat}, {max_lat} -- {min_lon}, {max_lon}")
 print(f"Number of co-ords: {num_coors}")
+#print(f"Start time: {start_time}, End time: {end_time}")
 
-real_start_time = datetime.now()
+timer = datetime.now()
 
-def do_thread():
-	i = 0
-	for trkpt in tree.iter('{http://www.topografix.com/GPX/1/1}trkpt'):
-		lat = float(trkpt.get('lat'))
-		lon = float(trkpt.get('lon'))
-		#print(lat, lon)
+time_cursor = timedelta()
 
-		x = (lon - min_lon) * (WIDTH / (max_lon - min_lon))
-		y = HEIGHT - ((lat - min_lat) * (HEIGHT / (max_lat - min_lat)))
+run_time = timedelta()
+for start, end in zip(start_times, end_times):
+    run_time = max(end - start, run_time)
 
-		plot_coord(x, y, size=1)
 
-		event_time = dateutil.parser.isoparse(trkpt.find('{http://www.topografix.com/GPX/1/1}time').text)
+count = 0
 
-		expected_time = (event_time - start_time) / SPEED
-		elapsed_time = datetime.now() - real_start_time
+im = Image.new('RGB', (WIDTH, HEIGHT), 'white')
+draw = ImageDraw.Draw(im)
+pixels = im.load()
 
-		print(expected_time, elapsed_time)
-		
-		if elapsed_time < expected_time:
-			print(f'Sleep for {expected_time - elapsed_time}')
-			time.sleep((expected_time - elapsed_time).total_seconds())
+last_x = [None for _ in trees]
+last_y = [None for _ in trees]
 
-	print('Done plotting, entering the main loop')
 
-t = threading.Thread(target=do_thread)
-t.start()
-root.mainloop()	
+while  time_cursor < run_time:
+    last_cursor = time_cursor
+    time_cursor += timedelta(seconds=(1/FPS)*SPEED) 
+    count+=1
+    print(f'Frame: {count} at {time_cursor}')
 
-# Keep the tk window alive...
-t.join()
+    for i, tree in enumerate(trees):
+
+        # clearour the leader TODO: Find more elegant way
+        x = last_x[i]
+        y = last_y[i]
+        if x and y:
+            try:
+                pixels[x, y] = (255, 0, 0)
+                pixels[x+1, y] = (255, 255, 255)
+                pixels[x+1, y+1] = (255, 255, 255)
+                pixels[x, y+1] = (255, 255, 255)
+            except: 
+                pass
+
+
+        for trkpt in tree.iter('{http://www.topografix.com/GPX/1/1}trkpt'):
+            event_time = dateutil.parser.isoparse(trkpt.find('{http://www.topografix.com/GPX/1/1}time').text)
+
+            # This result in a bug, need to figure out off by one
+            if event_time - start_times[i] < last_cursor:
+                continue
+
+            lat = float(trkpt.get('lat'))
+            lon = float(trkpt.get('lon'))
+            #print(lat, lon)
+
+            x = (lon - min_lon) * (WIDTH / (max_lon - min_lon))
+            y = HEIGHT - ((lat - min_lat) * (HEIGHT / (max_lat - min_lat)))
+
+            last_x[i] = x
+            last_y[i] = y
+    
+            #frame.ellipse((x, y, x+1, y+1), fill=red)
+            try: 
+                pixels[x, y] = (255, 0, 0)
+            except: 
+                pass # TODO: Clip out of bounds
+
+            if event_time - start_times[i] > time_cursor: 
+                try:
+                    pixels[x, y] = (0, 255, 0)
+                    pixels[x+1, y] = (0, 255, 0)
+                    pixels[x+1, y+1] = (0, 255, 0)
+                    pixels[x, y+1] = (0, 255, 0)
+                except: 
+                    pass # TODO: Clip out of bounds
+                break
+
+    images.append(im.copy())
+
+print('Done plotting, entering the main loop')
+
+print(len(images))
+
+# Freeze the last frame
+for _ in range(1, 50): 
+    images.append(im.copy())
+
+images[0].save('./pillow_imagedraw.gif',
+               save_all=True, append_images=images[1:], optimize=True, duration=1/FPS, loop=0)
+
+print(f'Generated in {datetime.now() - timer}')
