@@ -1,25 +1,24 @@
 #!/usr/bin/env python
 
 from xml.etree import ElementTree as ET
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime, timedelta
 import time
 import dateutil.parser
 import glob
 
+# TODO: Argparse
+DARK_MODE = True
 WIDTH = 750
 HEIGHT = 750
-
 BORDER = 10
-
 SPEED = 300
 FPS = 12
+VERBOSE = False
 
-verbose = False
+font = ImageFont.truetype("Helvetica.ttc", size=22)
 
-images = []
-
-gpx_files = glob.glob("*.gpx")
+gpx_files = glob.glob("./gpx/*.gpx")
 
 trees = [ET.parse(gpx_file) for gpx_file in gpx_files]
 
@@ -33,7 +32,7 @@ max_lon = float("-inf")
 
 start_time = None
 end_time = None
-num_coors = 0
+num_points = 0
 
 rides = []
 
@@ -63,7 +62,7 @@ for tree in trees:
         # Who cares about efficiency?
         end_time = time
 
-        num_coors += 1
+        num_points += 1
 
     ride["start_time"] = start_time
     ride["end_time"] = end_time
@@ -72,7 +71,7 @@ for tree in trees:
 
 print(f"Min Lat: {min_lat}, Max Lat: {max_lat}")
 print(f"Min Lon: {min_lon}, Max Lon: {max_lon}")
-print(f"Number of co-ords: {num_coors}")
+print(f"Number of coordinates: {points}")
 
 timer = datetime.now()
 time_cursor = timedelta()
@@ -83,7 +82,11 @@ for ride in rides:
 
 count = 0
 
-im = Image.new("RGB", (WIDTH + BORDER * 2, HEIGHT + BORDER * 2), "white")
+images = []
+
+im = Image.new(
+    "RGB", (WIDTH + BORDER * 2, HEIGHT + BORDER * 2), "Black" if DARK_MODE else "White"
+)
 pixels = im.load()
 
 while time_cursor < run_time:
@@ -91,7 +94,7 @@ while time_cursor < run_time:
     time_cursor += timedelta(seconds=(1 / FPS) * SPEED)
     count += 1
 
-    if verbose:
+    if VERBOSE:
         print(f"Frame: {count} at {time_cursor}")
 
     leaders = []
@@ -109,23 +112,28 @@ while time_cursor < run_time:
             x = (lon - min_lon) * (WIDTH / (max_lon - min_lon)) + BORDER
             y = HEIGHT - ((lat - min_lat) * (HEIGHT / (max_lat - min_lat))) + BORDER
 
-            try:
-                pixels[x, y] = (255, 0, 0)
-            except:
-                pass  # TODO: Clip out of bounds
+            px = pixels[x, y]
+            delta = (65, 0, 0) if DARK_MODE else (0, -65, -65)
+            pixels[x, y] = (px[0] + delta[0], px[1] + delta[1], px[2] + delta[2])
 
             if event_time - ride["start_time"] > time_cursor:
                 leaders.append((x, y))
                 break
 
     frame = im.copy()
+    draw = ImageDraw.Draw(frame)
+    try:
+        draw.text(
+            (WIDTH - 65, HEIGHT - 15),
+            f"{time_cursor}",
+            fill=(200, 200, 200),
+            align="right",
+            font=font,
+        )
+    except:
+        pass  # Don't worry about failed fonts
     for (x, y) in leaders:
-        draw = ImageDraw.Draw(frame)
-        try:
-            draw.ellipse((x - 1, y - 1, x + 1, y + 1), fill="green", outline="green")
-        except Exception as e:
-            print(f"Sorry: {e}")
-            pass  # TODO: Clip out of bounds
+        draw.ellipse((x - 1, y - 1, x + 1, y + 1), fill="green", outline="green")
 
     images.append(frame)
 
