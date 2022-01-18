@@ -4,9 +4,15 @@ from xml.etree import ElementTree as ET
 
 import tkinter
 import time
+import threading
+import dateutil.parser
+import math
+from datetime import datetime
 
 WIDTH = 500
 HEIGHT = 500
+
+SPEED = 300
 
 root = tkinter.Tk()
 myCanvas = tkinter.Canvas(root, bg="white", height=HEIGHT, width=WIDTH)
@@ -23,6 +29,9 @@ max_lat = float('-inf')
 min_lon = float('inf')
 max_lon = float('-inf')
 
+start_time = None
+num_coors = 0
+
 for trkpt in tree.iter('{http://www.topografix.com/GPX/1/1}trkpt'):
 	lat = float(trkpt.get('lat'))
 	lon = float(trkpt.get('lon'))
@@ -31,25 +40,44 @@ for trkpt in tree.iter('{http://www.topografix.com/GPX/1/1}trkpt'):
 	min_lon = min(min_lon, lon)
 	max_lon = max(max_lon, lon)
 
+	if start_time is None:
+		start_time = dateutil.parser.isoparse(trkpt.find('{http://www.topografix.com/GPX/1/1}time').text)
+	
+	num_coors += 1
+
 print(f"{min_lat}, {max_lat} -- {min_lon}, {max_lon}")
+print(f"Number of co-ords: {num_coors}")
 
-i = 0
-for trkpt in tree.iter('{http://www.topografix.com/GPX/1/1}trkpt'):
-	lat = float(trkpt.get('lat'))
-	lon = float(trkpt.get('lon'))
-	print(lat, lon)
+real_start_time = datetime.now()
 
-	x = (lon - min_lon) * (WIDTH / (max_lon - min_lon))
-	y = HEIGHT - ((lat - min_lat) * (HEIGHT / (max_lat - min_lat)))
+def do_thread():
+	i = 0
+	for trkpt in tree.iter('{http://www.topografix.com/GPX/1/1}trkpt'):
+		lat = float(trkpt.get('lat'))
+		lon = float(trkpt.get('lon'))
+		#print(lat, lon)
 
-	plot_coord(x, y, size=1)
+		x = (lon - min_lon) * (WIDTH / (max_lon - min_lon))
+		y = HEIGHT - ((lat - min_lat) * (HEIGHT / (max_lat - min_lat)))
 
-	# TODO: figure out why update() is slow; remove this hack
-	i += 1
-	if i % 10 == 0:
-		root.update()
+		plot_coord(x, y, size=1)
 
-print('Done plotting, entering the main loop')
+		event_time = dateutil.parser.isoparse(trkpt.find('{http://www.topografix.com/GPX/1/1}time').text)
+
+		expected_time = (event_time - start_time) / SPEED
+		elapsed_time = datetime.now() - real_start_time
+
+		print(expected_time, elapsed_time)
+		
+		if elapsed_time < expected_time:
+			print(f'Sleep for {expected_time - elapsed_time}')
+			time.sleep((expected_time - elapsed_time).total_seconds())
+
+	print('Done plotting, entering the main loop')
+
+t = threading.Thread(target=do_thread)
+t.start()
+root.mainloop()	
 
 # Keep the tk window alive...
-tkinter.mainloop()
+t.join()

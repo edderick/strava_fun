@@ -28,6 +28,9 @@ source ./venv/bin/activate
 ### Install packages
 
 ```
-pip install matplotlib 
+pip install python-dateutil 
 ```
+
+Maybe: 
+- pip install pillow
 
