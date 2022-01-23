@@ -29,6 +29,8 @@ SPORT_TYPES = ["CYCLING"]
 
 font = ImageFont.truetype("Helvetica.ttc", size=22)
 
+timer = datetime.now()
+
 # TODO: Parameterize
 gpx_files = glob.glob("./gpx/*.gpx_skip")
 fit_files = glob.glob("./all_data/export_14668556/activities/*.fit.*")
@@ -114,9 +116,12 @@ for activity in activities:
             "data": records,
             "start_time": start_time,
             "end_time": end_time,
+            "cursor": 0,
+            "num_records": len(records),
         }
     )
 
+print(f"Read {len(activities)} files  in {datetime.now() - timer}")
 print(f"Min Lat: {min_lat}, Max Lat: {max_lat}")
 print(f"Min Lon: {min_lon}, Max Lon: {max_lon}")
 print(f"Number of coordinates: {num_points}")
@@ -161,7 +166,9 @@ while time_cursor < run_time:
     leaders = []
 
     for ride in rides:
-        for datum in ride["data"]:
+        for i in range(ride["cursor"], ride["num_records"]):
+            datum = ride["data"][i]
+
             event_time = datum[0]
             lat = float(datum[1])
             lon = float(datum[2])
@@ -169,6 +176,8 @@ while time_cursor < run_time:
             # This result in a bug, need to figure out off by one
             if event_time - ride["start_time"] < last_cursor:
                 continue
+
+            ride["cursor"] = i
 
             x = (lon - min_lon) * (WIDTH / (max_lon - min_lon)) + BORDER
             y = HEIGHT - ((lat - min_lat) * (HEIGHT / (max_lat - min_lat))) + BORDER
