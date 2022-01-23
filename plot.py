@@ -77,47 +77,39 @@ for activity in activities:
         print(f"Skipping file {filename}. Contains no records.")
         continue
 
+    start_time, start_lat, start_lon = records[0]
+    end_time, _, _ = records[-1]
+
     if (
-        records[0][1] > MAX_STARTING_LAT
-        or records[0][1] < MIN_STARTING_LAT
-        or records[0][2] > MAX_STARTING_LON
-        or records[0][2] < MIN_STARTING_LON
+        start_lat > MAX_STARTING_LAT
+        or start_lat < MIN_STARTING_LAT
+        or start_lon > MAX_STARTING_LON
+        or start_lon < MIN_STARTING_LON
     ):
         print(f"Skipping file {filename}. Our of bounds.")
         continue
 
-    if (records[-1][0] - records[0][0]).total_seconds() / 60 > MAX_DURATION:
+    if (end_time - start_time).total_seconds() / 60 > MAX_DURATION:
         print(f"Skipping file {filename}. Activity too long")
         continue
 
-    data = []
-
     for record in records:
         time, lat, lon = record
-        data.append((time, lat, lon))
 
         min_lat = min(min_lat, lat)
         max_lat = max(max_lat, lat)
         min_lon = min(min_lon, lon)
         max_lon = max(max_lon, lon)
 
-        if start_time is None:
-            start_time = time
-
-        # Who cares about efficiency?
-        end_time = time
-
         num_points += 1
 
-    ride = {}
-    rides.append(ride)
-
-    ride["data"] = data
-
-    ride["start_time"] = start_time
-    ride["end_time"] = end_time
-
-    start_time = None
+    rides.append(
+        {
+            "data": records,
+            "start_time": start_time,
+            "end_time": end_time,
+        }
+    )
 
 print(f"Min Lat: {min_lat}, Max Lat: {max_lat}")
 print(f"Min Lon: {min_lon}, Max Lon: {max_lon}")
@@ -183,6 +175,7 @@ while time_cursor < run_time:
         )
     except:
         pass  # Don't worry about failed fonts
+
     for (x, y) in leaders:
         draw.ellipse((x - 1, y - 1, x + 1, y + 1), fill="green", outline="green")
 
