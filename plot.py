@@ -3,6 +3,7 @@
 from xml.etree import ElementTree as ET
 from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime, timedelta
+from fit_reader import FitFileReader
 import time
 import dateutil.parser
 import glob
@@ -14,15 +15,24 @@ HEIGHT = 750
 BORDER = 10
 SPEED = 300
 FPS = 12
-VERBOSE = False
+VERBOSE = True
+
+MAX_STARTING_LAT = 180
+MIN_STARTING_LAT = -180
+MAX_STARTING_LON = 180
+MIN_STARTING_LON = -180
+
+MAX_DURATION = 60  # Minutes
 
 font = ImageFont.truetype("Helvetica.ttc", size=22)
 
+# TODO: Parameterize
 gpx_files = glob.glob("./gpx/*.gpx")
+fit_files = glob.glob("./all_data/export_14668556/activities/*.fit.*")
 
-trees = [ET.parse(gpx_file) for gpx_file in gpx_files]
+gpx_trees = [ET.parse(gpx_file) for gpx_file in gpx_files]
 
-print(f"Processing {len(trees)} file(s)")
+print(f"Processing {len(gpx_files) + len(fit_files)} file(s)")
 
 # You're smarter than this. -.-
 min_lat = float("inf")
@@ -36,20 +46,55 @@ num_points = 0
 
 rides = []
 
-for tree in trees:
-    ride = {}
-    rides.append(ride)
+activities = []
 
-    ride["data"] = []
+for tree in gpx_trees:
+    records = []
 
     for trkpt in tree.iter("{http://www.topografix.com/GPX/1/1}trkpt"):
-        lat = float(trkpt.get("lat"))
-        lon = float(trkpt.get("lon"))
         time = dateutil.parser.isoparse(
             trkpt.find("{http://www.topografix.com/GPX/1/1}time").text
         )
+        lat = float(trkpt.get("lat"))
+        lon = float(trkpt.get("lon"))
+        records.append((time, lat, lon))
 
-        ride["data"].append((time, lat, lon))
+    activities.append({"filename": "TODO.gpx", "records": records})
+
+reader = FitFileReader()
+for fit_file in fit_files:
+    try:
+        records = reader.process_fit_file(fit_file)
+        activities.append({"filename": fit_file, "records": records})
+    except Exception as e:
+        print(f"Skipping file {fit_file} due to error: {e}")
+
+for activity in activities:
+    filename = activity["filename"]
+    records = activity["records"]
+
+    if len(records) == 0:
+        print(f"Skipping file {filename}. Contains no records.")
+        continue
+
+    if (
+        records[0][1] > MAX_STARTING_LAT
+        or records[0][1] < MIN_STARTING_LAT
+        or records[0][2] > MAX_STARTING_LON
+        or records[0][2] < MIN_STARTING_LON
+    ):
+        print(f"Skipping file {filename}. Our of bounds.")
+        continue
+
+    if (records[-1][0] - records[0][0]).total_seconds() / 60 > MAX_DURATION:
+        print(f"Skipping file {filename}. Activity too long")
+        continue
+
+    data = []
+
+    for record in records:
+        time, lat, lon = record
+        data.append((time, lat, lon))
 
         min_lat = min(min_lat, lat)
         max_lat = max(max_lat, lat)
@@ -64,6 +109,11 @@ for tree in trees:
 
         num_points += 1
 
+    ride = {}
+    rides.append(ride)
+
+    ride["data"] = data
+
     ride["start_time"] = start_time
     ride["end_time"] = end_time
 
@@ -71,7 +121,8 @@ for tree in trees:
 
 print(f"Min Lat: {min_lat}, Max Lat: {max_lat}")
 print(f"Min Lon: {min_lon}, Max Lon: {max_lon}")
-print(f"Number of coordinates: {points}")
+print(f"Number of coordinates: {num_points}")
+print(f"Number of rides: {len(rides)}")
 
 timer = datetime.now()
 time_cursor = timedelta()
