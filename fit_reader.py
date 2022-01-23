@@ -137,13 +137,21 @@ class FitFileReader:
         self._header_size = self._fit_file.read(1)[0]
         header = self._fit_file.read(self._header_size - 1)
 
-        (
-            self._protocol_version,
-            self._profile_version,
-            self._data_size,
-            self._data_type,
-            self._crc,
-        ) = struct.unpack("<BHI4sH", header)
+        if self._header_size == 14:
+            (
+                self._protocol_version,
+                self._profile_version,
+                self._data_size,
+                self._data_type,
+                self._crc,
+            ) = struct.unpack("<BHI4sH", header)
+        elif self._header_size == 12:
+            (
+                self._protocol_version,
+                self._profile_version,
+                self._data_size,
+                self._data_type,
+            ) = struct.unpack("<BHI4s", header)
 
         if _VERBOSE or _PRINT_HEADER:
             print(f"=====================================")

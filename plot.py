@@ -71,7 +71,8 @@ for fit_file in fit_files:
     try:
         records = reader.process_fit_file(fit_file)
         if reader.sport_type not in SPORT_TYPES:
-            print(f"Skipping {fit_file}, as it is {reader.sport_type}")
+            if VERBOSE:
+                print(f"Skipping {fit_file}, as it is {reader.sport_type}")
             continue
         activities.append({"filename": fit_file, "records": records})
     except Exception as e:
@@ -94,11 +95,13 @@ for activity in activities:
         or start_lon > MAX_STARTING_LON
         or start_lon < MIN_STARTING_LON
     ):
-        print(f"Skipping file {filename}. Out of bounds.")
+        if VERBOSE:
+            print(f"Skipping file {filename}. Out of bounds.")
         continue
 
     if (end_time - start_time).total_seconds() / 60 > MAX_DURATION:
-        print(f"Skipping file {filename}. Activity too long")
+        if VERBOSE:
+            print(f"Skipping file {filename}. Activity too long")
         continue
 
     for record in records:
@@ -122,8 +125,8 @@ for activity in activities:
     )
 
 print(f"Read {len(activities)} files  in {datetime.now() - timer}")
-print(f"Min Lat: {min_lat}, Max Lat: {max_lat}")
-print(f"Min Lon: {min_lon}, Max Lon: {max_lon}")
+print(f"Min Lat: {min_lat}, Max Lat: {max_lat} ({max_lat - min_lat})")
+print(f"Min Lon: {min_lon}, Max Lon: {max_lon} ({max_lon - min_lon})")
 print(f"Number of coordinates: {num_points}")
 print(f"Number of rides: {len(rides)}")
 
@@ -143,13 +146,13 @@ if STRETCH_MODE == False:
     lon_range = max_lon - min_lon
 
     if lat_range < lon_range:
-        HEIGHT = int(lon_range * (WIDTH / lat_range))
+        HEIGHT = int(lat_range * (WIDTH / lon_range))
         print(f"Resizing HEIGHT to {HEIGHT}")
     else:
-        WIDTH = int(lat_range * (HEIGHT / lon_range))
+        WIDTH = int(lon_range * (HEIGHT / lat_range))
         print(f"Resizing WIDTH to {WIDTH}")
 
-    print(f"{(WIDTH / lat_range)} == {(HEIGHT / lon_range)}")
+    print(f"{(lat_range / WIDTH)} == {(lon_range / HEIGHT)}")
 
 im = Image.new(
     "RGB", (WIDTH + BORDER * 2, HEIGHT + BORDER * 2), "Black" if DARK_MODE else "White"
