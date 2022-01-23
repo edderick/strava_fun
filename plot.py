@@ -10,8 +10,9 @@ import glob
 
 # TODO: Argparse
 DARK_MODE = True
-WIDTH = 750
-HEIGHT = 750
+STRETCH_MODE = False
+WIDTH = 700
+HEIGHT = 700
 BORDER = 10
 SPEED = 300
 FPS = 12
@@ -22,12 +23,14 @@ MIN_STARTING_LAT = -180
 MAX_STARTING_LON = 180
 MIN_STARTING_LON = -180
 
-MAX_DURATION = 60  # Minutes
+MAX_DURATION = 3 * 60  # Minutes
+
+SPORT_TYPES = ["CYCLING"]
 
 font = ImageFont.truetype("Helvetica.ttc", size=22)
 
 # TODO: Parameterize
-gpx_files = glob.glob("./gpx/*.gpx")
+gpx_files = glob.glob("./gpx/*.gpx_skip")
 fit_files = glob.glob("./all_data/export_14668556/activities/*.fit.*")
 
 gpx_trees = [ET.parse(gpx_file) for gpx_file in gpx_files]
@@ -65,6 +68,9 @@ reader = FitFileReader()
 for fit_file in fit_files:
     try:
         records = reader.process_fit_file(fit_file)
+        if reader.sport_type not in SPORT_TYPES:
+            print(f"Skipping {fit_file}, as it is {reader.sport_type}")
+            continue
         activities.append({"filename": fit_file, "records": records})
     except Exception as e:
         print(f"Skipping file {fit_file} due to error: {e}")
@@ -86,7 +92,7 @@ for activity in activities:
         or start_lon > MAX_STARTING_LON
         or start_lon < MIN_STARTING_LON
     ):
-        print(f"Skipping file {filename}. Our of bounds.")
+        print(f"Skipping file {filename}. Out of bounds.")
         continue
 
     if (end_time - start_time).total_seconds() / 60 > MAX_DURATION:
@@ -127,29 +133,41 @@ count = 0
 
 images = []
 
+if STRETCH_MODE == False:
+    lat_range = max_lat - min_lat
+    lon_range = max_lon - min_lon
+
+    if lat_range < lon_range:
+        HEIGHT = int(lon_range * (WIDTH / lat_range))
+        print(f"Resizing HEIGHT to {HEIGHT}")
+    else:
+        WIDTH = int(lat_range * (HEIGHT / lon_range))
+        print(f"Resizing WIDTH to {WIDTH}")
+
+    print(f"{(WIDTH / lat_range)} == {(HEIGHT / lon_range)}")
+
 im = Image.new(
     "RGB", (WIDTH + BORDER * 2, HEIGHT + BORDER * 2), "Black" if DARK_MODE else "White"
 )
 pixels = im.load()
 
 while time_cursor < run_time:
+    frame_timer = datetime.now()
+
     last_cursor = time_cursor
     time_cursor += timedelta(seconds=(1 / FPS) * SPEED)
     count += 1
 
-    if VERBOSE:
-        print(f"Frame: {count} at {time_cursor}")
-
     leaders = []
 
-    for i, ride in enumerate(rides):
+    for ride in rides:
         for datum in ride["data"]:
             event_time = datum[0]
             lat = float(datum[1])
             lon = float(datum[2])
 
             # This result in a bug, need to figure out off by one
-            if event_time - rides[i]["start_time"] < last_cursor:
+            if event_time - ride["start_time"] < last_cursor:
                 continue
 
             x = (lon - min_lon) * (WIDTH / (max_lon - min_lon)) + BORDER
@@ -180,6 +198,12 @@ while time_cursor < run_time:
         draw.ellipse((x - 1, y - 1, x + 1, y + 1), fill="green", outline="green")
 
     images.append(frame)
+
+    if VERBOSE:
+        frame_time = (datetime.now() - frame_timer).total_seconds()
+        percent = 100 * time_cursor / run_time
+
+        print(f"Frame: {count} at {time_cursor} ({percent:.1f}%) in {frame_time}s")
 
 print("Done plotting, saving file...")
 

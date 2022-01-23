@@ -73,6 +73,21 @@ _FIT_RECORD_FIELDS = {
     88: "UNKNOWN",
 }
 
+_FIT_SESSION_FIELDS = {
+    5: "SPORT",
+}
+
+_SPORT_TYPES = {
+    0: "GENERIC",
+    1: "RUNNING",
+    2: "CYCLING",
+    3: "TRANSITION",
+    4: "FITNESS_EQUIPMENT",
+    5: "SWIMMING",
+    17: "HIKING",
+    21: "E-BIKING",
+}
+
 _DATA_TYPES = {
     0: {"name": "enum", "string": "b", "size": 1},
     1: {"name": "sint8", "string": "b", "size": 1},
@@ -172,6 +187,7 @@ class FitFileReader:
 
         data_definition = self._data_definitions[local_message_num]
         endian_modifier = data_definition["endian_modifier"]
+        message_type = _GLOBAL_MESSAGE_NAMES[data_definition["global_message_num"]]
 
         if _PRINT_DATA:
             print(
@@ -203,7 +219,14 @@ class FitFileReader:
                 if _VERBOSE or _PRINT_DATA_FIELDS:
                     print(f'field[{i}/{field["field_definition_number"]}] = {unpacked}')
 
-                fields[_FIT_RECORD_FIELDS[field["field_definition_number"]]] = unpacked
+                if message_type == "RECORD":
+                    fields[
+                        _FIT_RECORD_FIELDS[field["field_definition_number"]]
+                    ] = unpacked
+
+                if message_type == "SESSION":
+                    if _FIT_SESSION_FIELDS[field["field_definition_number"]] == "SPORT":
+                        self._sport_type = _SPORT_TYPES[unpacked[0]]
 
             except Exception as e:
                 if _PRINT_DATA:
@@ -212,7 +235,7 @@ class FitFileReader:
                         f"with '{unpack_string}'. "
                         f"Size={field_size}. Error: {e}"
                     )
-        if _GLOBAL_MESSAGE_NAMES[data_definition["global_message_num"]] == "RECORD":
+        if message_type == "RECORD":
             self._process_record_message(fields)
 
     def _process_record_message(self, fields):
@@ -321,6 +344,10 @@ class FitFileReader:
         self._data_definitions = {}
         self._records = []
 
+    @property
+    def sport_type(self):
+        return self._sport_type
+
 
 if __name__ == "__main__":
     processor = FitFileReader()
@@ -328,6 +355,7 @@ if __name__ == "__main__":
     records = processor.process_fit_file("./_Mild_.fit")
     print(len(records))
     print(records[0])
+    print(processor.sport_type)
 
     # records = processor.process_fit_file("all_data/export_14668556/activities/1157017534.fit.gz")
     # print(len(records))
