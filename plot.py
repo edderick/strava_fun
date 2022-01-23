@@ -29,7 +29,8 @@ SPORT_TYPES = ["CYCLING"]
 
 font = ImageFont.truetype("Helvetica.ttc", size=22)
 
-timer = datetime.now()
+program_timer = datetime.now()
+file_read_timer = datetime.now()
 
 # TODO: Parameterize
 gpx_files = glob.glob("./gpx/*.gpx_skip")
@@ -124,13 +125,15 @@ for activity in activities:
         }
     )
 
-print(f"Read {len(activities)} files  in {datetime.now() - timer}")
+file_read_time = datetime.now() - file_read_timer
+
+print(f"Read {len(activities)} filesin {file_read_time}")
 print(f"Min Lat: {min_lat}, Max Lat: {max_lat} ({max_lat - min_lat})")
 print(f"Min Lon: {min_lon}, Max Lon: {max_lon} ({max_lon - min_lon})")
 print(f"Number of coordinates: {num_points}")
 print(f"Number of rides: {len(rides)}")
 
-timer = datetime.now()
+plotting_timer = datetime.now()
 time_cursor = timedelta()
 
 run_time = timedelta()
@@ -216,12 +219,19 @@ while time_cursor < run_time:
         percent = 100 * time_cursor / run_time
 
         print(f"Frame: {count} at {time_cursor} ({percent:.1f}%) in {frame_time}s")
+    else:
+        print(".", end="")
 
+plotting_time = datetime.now() - plotting_timer
+
+print()
 print("Done plotting, saving file...")
 
 # Freeze the last frame
 for _ in range(0, 50):
     images.append(im.copy())
+
+save_timer = datetime.now()
 
 images[0].save(
     "./animation.gif",
@@ -232,4 +242,10 @@ images[0].save(
     loop=0,
 )
 
-print(f"Generated {len(images) - 50} frames in {datetime.now() - timer}")
+save_time = datetime.now() - save_timer
+
+print()
+print(f"Generated {len(images) - 50} frames in {datetime.now() - program_timer}")
+print(f"  File read took: {file_read_time}")
+print(f"  Plotting took: {plotting_time}")
+print(f"  Save took: {save_time}")
