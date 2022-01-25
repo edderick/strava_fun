@@ -2,7 +2,7 @@
 
 A hobby project to build visualisations based on Strava activities
 
-![The Results](./animation.gif)
+![The Results](./images/animation.gif)
 
 Inspired by: [this](https://www.reddit.com/r/dataisbeautiful/comments/s607z5/oc_2021_recap_of_my_runs_on_strava/)
 
