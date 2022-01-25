@@ -20,13 +20,19 @@ let polylines = [];
 
 setInterval(() => {
    const elapsedSeconds = Math.round(((Date.now() - beginTime) / 1000) * SPEED);
-   // console.log("Elapsed Time: ", elapsedSeconds);
+   // console.log("Elapsed Time: ", elapsedSeconds, "(", elapsedSeconds - previousElapsedSeconds, ")");
 
     const len = lines.length;
     for (let i = 0; i < len; i++)
     {
         // console.log("Rendering the line");
         const line = lines[i];
+
+        if (line['lastPoint'] + 1 === line['end'])
+        {
+            continue;
+        }
+
         const points = line['points'];
 
         if (polylines.length <= i)
@@ -34,12 +40,11 @@ setInterval(() => {
             // console.log("Adding the line");
             let latlngs = [];
             // Draw all the frames from the past
-            // TODO: while loop
             for (let j = 0; j < line['end']; j++)
             {
                 if (points[j]['pointTime'] > previousElapsedSeconds)
                 {
-                    line['lastPoint'] = j - 1;
+                    line['lastPoint'] = j;
                     break;
                 }
                 latlngs.push(points[j]['point']);
@@ -55,16 +60,24 @@ setInterval(() => {
         }
 
         const polyline = polylines[i];
-    
-        for (let j = line['lastPoint']; j < line['end']; j++)
-        {
-            if (points[j]['pointTime'] > elapsedSeconds)
+        
+        setTimeout(() => {
+            const data = polyline.getLatLngs();
+            let redraw = false;
+            for (let j = line['lastPoint']; j < line['end']; j++)
             {
-                line['lastPoint'] = j - 1;
-                break;
+                line['lastPoint'] = j;
+                if (points[j]['pointTime'] > elapsedSeconds)
+                {
+                    break;
+                }
+                redraw = true;
+                data.push(points[j]['point']);
             }
-            polyline.addLatLng(points[j]['point']);
-        }
+            if (redraw) {
+                polyline.setLatLngs(data);
+            }
+        }, 0);
     }
     previousElapsedSeconds = elapsedSeconds;
 
@@ -87,7 +100,7 @@ function onFilesSelected(e) {
         let line = {
             points: [],
             lastPoint: 0,
-            end: trkpts.length,
+            end: trkpts.length - 1,
         };
 
         const len = trkpts.length; 
