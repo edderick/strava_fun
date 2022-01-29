@@ -9,14 +9,24 @@ L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_toke
     accessToken: 'your.mapbox.access.token'
 }).addTo(map);
 
-const FRAMES_PER_SECOND = 15;
+const FRAMES_PER_SECOND = 12;
 const SPEED = 120;
+const SIMPLIFY = true;
 
-const beginTime = Date.now();
-let previousElapsedSeconds = 100000000;
+let beginTime = Date.now();
+let previousElapsedSeconds = 0;
 
 let lines = [];
 let polylines = [];
+
+function simplify(latlngs)
+{
+    if (SIMPLIFY)
+    {
+        return L.LineUtil.simplify(latlngs);
+    }
+    return latlngs;
+}
 
 setInterval(() => {
    const elapsedSeconds = Math.round(((Date.now() - beginTime) / 1000) * SPEED);
@@ -50,7 +60,7 @@ setInterval(() => {
                 latlngs.push(points[j]['point']);
             }
 
-            const polyline = L.polyline(latlngs, {
+            const polyline = L.polyline(simplify(latlngs), {
                 color: 'green', 
                 interactive: false,
                 lineJoin: false,
@@ -75,7 +85,7 @@ setInterval(() => {
                 data.push(points[j]['point']);
             }
             if (redraw) {
-                polyline.setLatLngs(data);
+                polyline.setLatLngs(simplify(data));
             }
         }, 0);
     }
@@ -86,6 +96,15 @@ setInterval(() => {
 let bounds = L.latLngBounds();
 
 function onFilesSelected(e) {
+    const numSelectedFiles = e.target.files.length;
+    let openFiles = 0;
+
+    for (let i = 0; i < polylines.length; i++)
+    {
+        polylines[i].removeFrom(map);
+    }
+
+    let newLines = [];
 
     const onLoad = e => {
         console.log("onLoad ", e);
@@ -95,7 +114,6 @@ function onFilesSelected(e) {
         const trkpts = xmlDoc.getElementsByTagName('trkpt');
         
         const startTime = new Date(trkpts[0].getElementsByTagName('time')[0].textContent);
-        const beginTime = Date.now();
 
         let line = {
             points: [],
@@ -123,13 +141,22 @@ function onFilesSelected(e) {
             // TODO: 
             // Figure out how to draw multiple spans. See Manhattan Perimiter for a test case 
         }
-        lines.push(line);
+        newLines.push(line);
 
-        map.fitBounds(bounds);
+        console.log(openFiles, numSelectedFiles);
+
+        openFiles++;
+        if (openFiles == numSelectedFiles)
+        {
+            map.fitBounds(bounds);
+            beginTime = Date.now(); 
+            previousElapsedSeconds = 0;
+            polylines = [];
+            lines = newLines;
+        }
     }
 
-    const len = e.target.files.length;
-    for (let i = 0; i < len; i++) {
+    for (let i = 0; i < numSelectedFiles; i++) {
         console.log("reading ", e.target.files[i]);
 
         var fr = new FileReader();
