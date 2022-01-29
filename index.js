@@ -10,88 +10,79 @@ L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_toke
 }).addTo(map);
 
 const FRAMES_PER_SECOND = 12;
-const SPEED = 120;
 const SIMPLIFY = false;
 const VERBOSE = false;
 
-let beginTime = Date.now();
-let previousElapsedSeconds = 0;
-
+let speed = parseInt(document.getElementById('speed').value, 10);
 let lines = [];
-let polylines = [];
 
-function simplify(latlngs)
-{
-    if (SIMPLIFY)
-    {
+/**
+ * Helper fuction to allow disabling siplifying the lines
+ */
+function simplify(latlngs) {
+    if (SIMPLIFY) {
         return L.LineUtil.simplify(latlngs);
     }
     return latlngs;
 }
 
+let elapsedSeconds = 0;
+let totalSeconds = 0;
+
 setInterval(() => {
-   const elapsedSeconds = Math.round(((Date.now() - beginTime) / 1000) * SPEED);
-   if (VERBOSE) {
-       console.log("Elapsed Time: ", elapsedSeconds, "(", elapsedSeconds - previousElapsedSeconds, ")");
-   }
+    time.textContent = secondsToTimestamp(elapsedSeconds);
 
     const linesLen = lines.length;
     for (let i = 0; i < linesLen; i++) {
         const line = lines[i];
 
-        if (line['lastPoint'] + 1 === line['end']) {
+        // TODO: Find more times we can skip rendering
+        if (elapsedSeconds >= line['lastTime'] && line['lastTime'] === line['endTime']) {
             continue;
         }
-
-        const points = line['points'];
-
-        if (polylines.length <= i) {
-            const polyline = L.polyline([], {
-                color: 'red', 
-                interactive: false,
-                lineJoin: 'miter',
-                stroke: true,
-                weight: 1,
-                opacity: 0.75,
-            });
-            polyline.addTo(map)
-            polylines.push(polyline);
-        }
-
-        const polyline = polylines[i];
         
-        setTimeout(() => {
-            let redraw = false;
-            let j = line['lastPoint'];
-            for (; j < line['end']; j++) {
-                line['lastPoint'] = j;
-                if (line['pointTimes'][j] > elapsedSeconds) {
-                    break;
-                }
-                redraw = true;
-                data = points.slice(0, j);
+        // TODO: Binary search for the time
+        let j = 0;
+        for (; j <= line['end']; j++) {
+            if (line['pointTimes'][j] > elapsedSeconds) {
+                break;
             }
-            if (redraw) { 
-                polyline.setLatLngs(simplify(points.slice(0, j)));
-            }
-        }, 0);
+            line['lastPoint'] = j;
+            line['lastTime'] = line['pointTimes'][j];
+        }
+        if (j != line['lastPoint']) { 
+            setTimeout(() => {
+                line['polylines'][line['polylines'].length - 1].setLatLngs(simplify(line['points'].slice(0, j)));
+            }, 0);
+        }
     }
-    previousElapsedSeconds = elapsedSeconds;
 
-}, 1000/FRAMES_PER_SECOND);
+}, 1000 / FRAMES_PER_SECOND);
 
-let bounds = L.latLngBounds();
-
+// TODO: Add a loading spinner?
 function onFilesSelected(e) {
-    const numSelectedFiles = e.target.files.length;
-    let openFiles = 0;
+    pause();
 
-    const polylinesLen = polylines.length;
-    for (let i = 0; i < polylinesLen; i++) {
-        polylines[i].removeFrom(map);
+    const bounds = L.latLngBounds();
+    const numSelectedFiles = e.target.files.length;
+
+    let openFiles = 0;
+    totalSeconds = 0;
+
+    const linesLen = lines.length;
+    for (let j = 0; j < linesLen; j++) {
+        const polylinesLen = lines[j]['polylines'].length;
+        for (let i = 0; i < polylinesLen; i++) {
+            if (VERBOSE) {
+                console.log('clearing', j, i);
+            }
+            lines[j]['polylines'][i].removeFrom(map);
+        }
     }
 
     let newLines = [];
+
+    polylines = [];
 
     const onLoad = e => {
         if (VERBOSE) {
@@ -108,8 +99,22 @@ function onFilesSelected(e) {
             points: [],
             pointTimes: [],
             lastPoint: 0,
+            lastTime: 0,
             end: trkpts.length - 1,
+            endTime: 0,
+            polylines: [],
         };
+
+        const polyline = L.polyline([], {
+            color: 'red', 
+            interactive: false,
+            lineJoin: 'miter',
+            stroke: true,
+            weight: 1,
+            opacity: 0.75,
+        });
+        polyline.addTo(map)
+        line['polylines'].push(polyline);
 
         const len = trkpts.length; 
         for (let i = 0; i < len; i++) {
@@ -121,14 +126,22 @@ function onFilesSelected(e) {
             const lon = trkpt.getAttribute('lon');
             const point = L.latLng(lat, lon);
 
+            // TODO: Do this better
+            line['endTime'] = pointTime;
+            if (pointTime > totalSeconds)
+            {
+                totalSeconds = pointTime;
+            }
+
             bounds.extend(point);
 
             line['pointTimes'].push(pointTime);
             line['points'].push(point);
-    
+
             // TODO: 
             // Figure out how to draw multiple spans. See Manhattan Perimiter for a test case 
         }
+
         newLines.push(line);
 
         if (VERBOSE) {
@@ -136,12 +149,12 @@ function onFilesSelected(e) {
         }
 
         openFiles++;
+
         if (openFiles == numSelectedFiles) {
+            reset();
             map.fitBounds(bounds);
-            beginTime = Date.now(); 
-            previousElapsedSeconds = 0;
-            polylines = [];
             lines = newLines;
+            play();
         }
     }
 
@@ -154,4 +167,60 @@ function onFilesSelected(e) {
         fr.onload = onLoad;
         fr.readAsText(e.target.files[i]);
     }
+}
+
+let stepperKey;
+
+function onTimeSelected(e) {
+    elapsedSeconds = e.target.value * totalSeconds;
+}
+
+function secondsToTimestamp(totalSeconds) {
+    const hours = `${Math.floor(totalSeconds / (60 * 60))}`;
+    const minutes = `${Math.floor((totalSeconds / 60) % 60)}`.padStart(2, 0);
+    const seconds = `${Math.floor((totalSeconds % 60))}`.padStart(2, '0');
+
+    return `${hours}h ${minutes}m ${seconds}s`;
+}
+
+function play() {
+    clearInterval(stepperKey);
+
+    const slider = document.getElementById('slider');
+    const time = document.getElementById('time');
+
+    stepperKey = setInterval(() => {
+        if (elapsedSeconds >= totalSeconds) {
+            return;
+        }
+        elapsedSeconds += Math.min((speed / FRAMES_PER_SECOND), totalSeconds);
+        slider.value = elapsedSeconds / totalSeconds;
+
+    }, (1000 / FRAMES_PER_SECOND));
+}
+
+function pause() {
+    clearInterval(stepperKey);
+}
+
+function reset() {
+    document.getElementById("slider").value = '0';
+    elapsedSeconds = 0;
+}
+
+function onPlayClicked(e) {
+    play();
+}
+
+function onPauseClicked(e) {
+    pause();
+}
+
+function onResetClicked(e) {
+    reset();
+}
+
+function onSpeedSelected(e)
+{
+    speed = parseInt(e.target.value, 10);
 }

@@ -1,2 +1,4 @@
 #map { height: 90%; }
-body { background-color: #222222; }
+#slider { width: 100%; }
+body { background-color: #222222; color: #AAAAAA; }
+a {color: red; }

@@ -10,7 +10,20 @@
     </head>
     <body>
          <div id="map"></div>
-         <input type="file" onchange="onFilesSelected(event)" multiple/>
+         <input type="range" min="0" max="1" step="0.001" value="0" id="slider" oninput="onTimeSelected(event)" />
+         <center>
+             <a href='javascript:void(0)' onclick='onPlayClicked(event)'>Play</a>&nbsp;
+             <a href='javascript:void(0)' onclick='onPauseClicked(event)'>Pause</a>&nbsp;
+             <a href='javascript:void(0)' onclick='onResetClicked(event)'>Reset</a>
+         </center>
+         <center>
+             <div>
+                 <input type="file" onchange="onFilesSelected(event)" multiple/>
+                 Speed: <input type="number" id='speed' value='60' onchange="onSpeedSelected(event)" />
+                 Time: <span id='time'>0h 00m 00s</span>
+             </div>
+         </center>
+
          <script src='./index.js'></script>
     </body>
 </html>
