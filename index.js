@@ -114,7 +114,9 @@ function onFilesSelected(e) {
 
     polylines = [];
 
-    const onLoad = e => {
+    const onLoad = (file, e) => {
+        console.log("onLoad ", file, e);
+
         if (VERBOSE) {
             console.log("onLoad ", e);
         }
@@ -194,7 +196,7 @@ function onFilesSelected(e) {
         }
 
         var fr = new FileReader();
-        fr.onload = onLoad;
+        fr.onload = ev => { onLoad(e.target.files[i], ev); };
         fr.readAsText(e.target.files[i]);
     }
 }
