@@ -31,38 +31,22 @@ function simplify(latlngs)
 
 setInterval(() => {
    const elapsedSeconds = Math.round(((Date.now() - beginTime) / 1000) * SPEED);
-   if (VERBOSE)
-   {
+   if (VERBOSE) {
        console.log("Elapsed Time: ", elapsedSeconds, "(", elapsedSeconds - previousElapsedSeconds, ")");
    }
 
-    const len = lines.length;
-    for (let i = 0; i < len; i++)
-    {
+    const linesLen = lines.length;
+    for (let i = 0; i < linesLen; i++) {
         const line = lines[i];
 
-        if (line['lastPoint'] + 1 === line['end'])
-        {
+        if (line['lastPoint'] + 1 === line['end']) {
             continue;
         }
 
         const points = line['points'];
 
-        if (polylines.length <= i)
-        {
-            let latlngs = [];
-            // Draw all the frames from the past
-            for (let j = 0; j < line['end']; j++)
-            {
-                if (points[j]['pointTime'] > previousElapsedSeconds)
-                {
-                    line['lastPoint'] = j;
-                    break;
-                }
-                latlngs.push(points[j]['point']);
-            }
-
-            const polyline = L.polyline(simplify(latlngs), {
+        if (polylines.length <= i) {
+            const polyline = L.polyline([], {
                 color: 'red', 
                 interactive: false,
                 lineJoin: 'miter',
@@ -77,20 +61,18 @@ setInterval(() => {
         const polyline = polylines[i];
         
         setTimeout(() => {
-            const data = polyline.getLatLngs();
             let redraw = false;
-            for (let j = line['lastPoint']; j < line['end']; j++)
-            {
+            let j = line['lastPoint'];
+            for (; j < line['end']; j++) {
                 line['lastPoint'] = j;
-                if (points[j]['pointTime'] > elapsedSeconds)
-                {
+                if (line['pointTimes'][j] > elapsedSeconds) {
                     break;
                 }
                 redraw = true;
-                data.push(points[j]['point']);
+                data = points.slice(0, j);
             }
-            if (redraw) {
-                polyline.setLatLngs(simplify(data));
+            if (redraw) { 
+                polyline.setLatLngs(simplify(points.slice(0, j)));
             }
         }, 0);
     }
@@ -104,16 +86,15 @@ function onFilesSelected(e) {
     const numSelectedFiles = e.target.files.length;
     let openFiles = 0;
 
-    for (let i = 0; i < polylines.length; i++)
-    {
+    const polylinesLen = polylines.length;
+    for (let i = 0; i < polylinesLen; i++) {
         polylines[i].removeFrom(map);
     }
 
     let newLines = [];
 
     const onLoad = e => {
-        if (VERBOSE)
-        {
+        if (VERBOSE) {
             console.log("onLoad ", e);
         }
 
@@ -125,6 +106,7 @@ function onFilesSelected(e) {
 
         let line = {
             points: [],
+            pointTimes: [],
             lastPoint: 0,
             end: trkpts.length - 1,
         };
@@ -141,24 +123,20 @@ function onFilesSelected(e) {
 
             bounds.extend(point);
 
-            line['points'].push({
-                pointTime,
-                point
-            });
+            line['pointTimes'].push(pointTime);
+            line['points'].push(point);
     
             // TODO: 
             // Figure out how to draw multiple spans. See Manhattan Perimiter for a test case 
         }
         newLines.push(line);
 
-        if (VERBOSE)
-        {
+        if (VERBOSE) {
             console.log(openFiles, numSelectedFiles);
         }
 
         openFiles++;
-        if (openFiles == numSelectedFiles)
-        {
+        if (openFiles == numSelectedFiles) {
             map.fitBounds(bounds);
             beginTime = Date.now(); 
             previousElapsedSeconds = 0;
@@ -168,8 +146,7 @@ function onFilesSelected(e) {
     }
 
     for (let i = 0; i < numSelectedFiles; i++) {
-        if (VERBOSE)
-        {
+        if (VERBOSE) {
             console.log("reading ", e.target.files[i]);
         }
 
