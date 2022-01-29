@@ -1,17 +1,18 @@
 var map = L.map('map').setView([51.505, -0.09], 13);
 
-L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoiZXNlYWJyb29rIiwiYSI6ImNreXRlM2ljNzFjdG8yd20xZG9zeGJidmQifQ.pqA117z2Fm5zPbzdY1_WhA', {
+L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
     attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
     maxZoom: 18,
-    id: 'mapbox/streets-v11',
+    id: 'eseabrook/ckyz7w9xw000q15kbv0db8ti9',
     tileSize: 512,
     zoomOffset: -1,
-    accessToken: 'your.mapbox.access.token'
+    accessToken: 'pk.eyJ1IjoiZXNlYWJyb29rIiwiYSI6ImNreXRlM2ljNzFjdG8yd20xZG9zeGJidmQifQ.pqA117z2Fm5zPbzdY1_WhA'
 }).addTo(map);
 
 const FRAMES_PER_SECOND = 12;
 const SPEED = 120;
-const SIMPLIFY = true;
+const SIMPLIFY = false;
+const VERBOSE = false;
 
 let beginTime = Date.now();
 let previousElapsedSeconds = 0;
@@ -30,12 +31,14 @@ function simplify(latlngs)
 
 setInterval(() => {
    const elapsedSeconds = Math.round(((Date.now() - beginTime) / 1000) * SPEED);
-   // console.log("Elapsed Time: ", elapsedSeconds, "(", elapsedSeconds - previousElapsedSeconds, ")");
+   if (VERBOSE)
+   {
+       console.log("Elapsed Time: ", elapsedSeconds, "(", elapsedSeconds - previousElapsedSeconds, ")");
+   }
 
     const len = lines.length;
     for (let i = 0; i < len; i++)
     {
-        // console.log("Rendering the line");
         const line = lines[i];
 
         if (line['lastPoint'] + 1 === line['end'])
@@ -47,7 +50,6 @@ setInterval(() => {
 
         if (polylines.length <= i)
         {
-            // console.log("Adding the line");
             let latlngs = [];
             // Draw all the frames from the past
             for (let j = 0; j < line['end']; j++)
@@ -61,9 +63,12 @@ setInterval(() => {
             }
 
             const polyline = L.polyline(simplify(latlngs), {
-                color: 'green', 
+                color: 'red', 
                 interactive: false,
-                lineJoin: false,
+                lineJoin: 'miter',
+                stroke: true,
+                weight: 1,
+                opacity: 0.75,
             });
             polyline.addTo(map)
             polylines.push(polyline);
@@ -107,7 +112,10 @@ function onFilesSelected(e) {
     let newLines = [];
 
     const onLoad = e => {
-        console.log("onLoad ", e);
+        if (VERBOSE)
+        {
+            console.log("onLoad ", e);
+        }
 
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(e.target.result, "text/xml");
@@ -143,7 +151,10 @@ function onFilesSelected(e) {
         }
         newLines.push(line);
 
-        console.log(openFiles, numSelectedFiles);
+        if (VERBOSE)
+        {
+            console.log(openFiles, numSelectedFiles);
+        }
 
         openFiles++;
         if (openFiles == numSelectedFiles)
@@ -157,11 +168,13 @@ function onFilesSelected(e) {
     }
 
     for (let i = 0; i < numSelectedFiles; i++) {
-        console.log("reading ", e.target.files[i]);
+        if (VERBOSE)
+        {
+            console.log("reading ", e.target.files[i]);
+        }
 
         var fr = new FileReader();
         fr.onload = onLoad;
         fr.readAsText(e.target.files[i]);
     }
 }
-
