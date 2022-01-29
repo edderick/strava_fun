@@ -26,6 +26,44 @@ function simplify(latlngs) {
     return latlngs;
 }
 
+function findLatestTimeBefore(timesArr, targetTime) {
+    // I should know how to write a bunary search, but I dont't...
+    let lo = 0;
+    let hi = timesArr.length;
+
+    const limit = timesArr.length;
+
+    // Not using while true, because I have no confidence in myself
+    for (let i = 0; i < limit; i++) {
+        let mid = Math.floor((hi - lo) / 2) + lo;
+        if (timesArr[mid] > targetTime) {
+            hi = mid;
+        }
+        else if (timesArr[mid] < targetTime) {
+            lo = mid;
+        }
+        else {
+            return mid;
+        }
+
+        if (hi - lo <= 1) {
+            if (timesArr[hi] < targetTime) {
+                return hi;
+            }
+            else {
+                return lo
+            }
+        }
+    }
+
+    console.log("Warning: Falling back to linear search.", timesArr, targetTime)
+    for (let i = 0; i < limit; i++) {
+        if (timesArr[i] > targetTime) {
+            return i - 1;
+        }
+    }
+}
+
 let elapsedSeconds = 0;
 let totalSeconds = 0;
 
@@ -40,20 +78,12 @@ setInterval(() => {
         if (elapsedSeconds >= line['lastTime'] && line['lastTime'] === line['endTime']) {
             continue;
         }
-        
-        // TODO: Binary search for the time
-        let j = 0;
-        for (; j <= line['end']; j++) {
-            if (line['pointTimes'][j] > elapsedSeconds) {
-                break;
-            }
-            line['lastPoint'] = j;
-            line['lastTime'] = line['pointTimes'][j];
-        }
-        if (j != line['lastPoint']) { 
-            setTimeout(() => {
-                line['polylines'][line['polylines'].length - 1].setLatLngs(simplify(line['points'].slice(0, j)));
-            }, 0);
+
+        let index = findLatestTimeBefore(line['pointTimes'], elapsedSeconds);
+        if (index !== line['lastPoint']) {
+            line['lastPoint'] = index;
+            line['lastTime'] = line['pointTimes'][index];
+            line['polylines'][line['polylines'].length - 1].setLatLngs(simplify(line['points'].slice(0, index)));
         }
     }
 
@@ -92,7 +122,7 @@ function onFilesSelected(e) {
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(e.target.result, "text/xml");
         const trkpts = xmlDoc.getElementsByTagName('trkpt');
-        
+
         const startTime = new Date(trkpts[0].getElementsByTagName('time')[0].textContent);
 
         let line = {
@@ -106,7 +136,7 @@ function onFilesSelected(e) {
         };
 
         const polyline = L.polyline([], {
-            color: 'red', 
+            color: 'red',
             interactive: false,
             lineJoin: 'miter',
             stroke: true,
@@ -116,7 +146,7 @@ function onFilesSelected(e) {
         polyline.addTo(map)
         line['polylines'].push(polyline);
 
-        const len = trkpts.length; 
+        const len = trkpts.length;
         for (let i = 0; i < len; i++) {
             const trkpt = trkpts[i];
 
@@ -138,8 +168,8 @@ function onFilesSelected(e) {
             line['pointTimes'].push(pointTime);
             line['points'].push(point);
 
-            // TODO: 
-            // Figure out how to draw multiple spans. See Manhattan Perimiter for a test case 
+            // TODO:
+            // Figure out how to draw multiple spans. See Manhattan Perimiter for a test case
         }
 
         newLines.push(line);
